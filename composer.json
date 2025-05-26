@@ -1,6 +1,13 @@
 {
     "name": "idkwhoami/flux-wizards",
+    "homepage": "https://github.com/idkwhoami/flux-wizards",
+    "description": "This package provides a reusable, configurable wizard livewire component styled using Flux",
     "type": "library",
+    "keywords": [
+        "Idkwhoami",
+        "laravel",
+        "flux-wizards"
+    ],
     "license": "MIT",
     "version": "0.1.0",
     "authors": [

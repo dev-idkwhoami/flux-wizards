@@ -1,11 +1,13 @@
 <?php
 
+namespace Idkwhoami\FluxWizards;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
-class FluxWizardServiceProvider extends ServiceProvider
+class FluxWizardsServiceProvider extends ServiceProvider
 {
-    public function boot(): void
+    public function boot()
     {
         $this->prepareConfig();
         $this->prepareLocalization();
@@ -18,9 +20,18 @@ class FluxWizardServiceProvider extends ServiceProvider
         ]);
 
         $this->publishes([
-            __DIR__.'/../resources/views/flux' => \Idkwhoami\FluxWizards\resource_path('views/flux'),
-        ], 'flux-wizards-flux-views');
+            __DIR__.'/../resources/views' => resource_path('views/vendor/flux-wizards'),
+        ], 'flux-wizards-views');
+    }
 
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        //
     }
 
     /**
@@ -39,7 +50,7 @@ class FluxWizardServiceProvider extends ServiceProvider
     private function prepareConfig(): void
     {
         $this->publishes([
-            __DIR__.'/../config/flux-wizards.php' => \Idkwhoami\FluxWizards\config_path('flux-wizards.php'),
+            __DIR__.'/../config/flux-wizards.php' => config_path('flux-wizards.php'),
         ], [
             'flux-wizards-config',
             'flux-wizards'
@@ -54,12 +65,12 @@ class FluxWizardServiceProvider extends ServiceProvider
     /**
      * @return void
      */
-    public function prepareLocalization(): void
+    public function prepareLocalization()
     {
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'flux-wizards');
 
         $this->publishes([
-            __DIR__.'/../lang' => \Idkwhoami\FluxWizards\lang_path('vendor/flux-wizards'),
+            __DIR__.'/../lang' => lang_path('vendor/flux-wizards'),
         ], [
             'flux-wizards-lang',
             'flux-wizards'
