@@ -2,243 +2,179 @@
 
 namespace Idkwhoami\FluxWizards\Core;
 
-use Closure;
-use InvalidArgumentException;
-use Laravel\SerializableClosure\SerializableClosure;
 use Livewire\Wireable;
 
 class Wizard implements Wireable
 {
     /**
-     * The wizard name.
+     * The root step of the wizard.
      *
-     * @var string|null
+     * @var Step
      */
-    protected ?string $name = null;
+    protected Step $rootStep;
 
     /**
-     * The steps in this wizard.
+     * The current step of the wizard.
      *
-     * @var array<string, Step>
+     * @var Step
      */
-    protected array $steps = [];
+    protected Step $currentStep;
 
     /**
-     * The current step key.
-     *
-     * @var string|null
-     */
-    protected ?string $currentStep = null;
-
-    /**
-     * The wizard data.
+     * The data collected from all steps.
      *
      * @var array
      */
     protected array $data = [];
 
     /**
-     * Custom step transitions.
+     * The history of visited steps.
      *
-     * @var array<string, array<string, Closure>>
+     * @var array<string>
      */
-    protected array $transitions = [];
+    protected array $history = [];
 
     /**
-     * The flow callback.
+     * The name of the wizard.
      *
-     * @var Closure|null
+     * @var string
      */
-    protected Closure|null $flowCallback = null;
+    protected string $name = '';
 
     /**
-     * @param  string|null  $currentStep
-     * @param  array  $data
-     * @param  Closure|null  $flowCallback
-     * @param  string|null  $name
-     * @param  Step[]  $steps
-     * @param  \Closure[][]  $transitions
+     * The flow resolver for the wizard.
+     *
+     * @var \Closure|null
      */
-    public function __construct(
-        ?string $name,
-        array $steps = [],
-        array $transitions = [],
-        ?string $currentStep = null,
-        array $data = [],
-        ?Closure $flowCallback = null,
-    ) {
-        $this->name = $name;
-        $this->steps = $steps;
-        $this->transitions = $transitions;
-        $this->currentStep = $currentStep;
-        $this->data = $data;
-        $this->flowCallback = $flowCallback;
+    protected ?\Closure $flowResolver = null;
+
+    /**
+     * Create a new wizard instance.
+     *
+     * @param Step $rootStep
+     */
+    public function __construct(Step $rootStep)
+    {
+        $this->rootStep = $rootStep;
+        $this->currentStep = $rootStep;
+        $this->history[] = $rootStep->getKey();
     }
 
     /**
      * Create a new wizard instance.
      *
-     * @param  array  $data  Initial wizard data
+     * @param array $initialData
      * @return static
      */
-    public static function make(string $name, array $data = []): static
+    public static function make(array $initialData = []): self
     {
-        return new static($name, data: $data);
-    }
+        $rootStep = Step::make('root', 'Root Step', 'steps.root');
+        $wizard = new static($rootStep);
 
-    /**
-     * Set the wizard name.
-     *
-     * @param  string  $name
-     * @return $this
-     */
-    public function name(string $name): static
-    {
-        $this->name = $name;
-
-        return $this;
-    }
-
-    /**
-     * Add multiple steps to the wizard.
-     *
-     * @param  array<Step>  $steps
-     * @return $this
-     */
-    public function steps(array $steps): static
-    {
-        foreach ($steps as $step) {
-            $this->addStep($step);
+        if (!empty($initialData)) {
+            $wizard->setData($initialData);
         }
 
-        return $this;
+        return $wizard;
     }
 
     /**
-     * Set the flow callback.
+     * Get the root step of the wizard.
      *
-     * @param  Closure  $callback
-     * @return $this
-     */
-    public function flow(Closure $callback): static
-    {
-        $this->flowCallback = $callback;
-
-        return $this;
-    }
-
-    /**
-     * Get the wizard name.
-     *
-     * @return string|null
-     */
-    public function getName(): string
-    {
-        return $this->name;
-    }
-
-    /**
-     * Add a step to the wizard.
-     *
-     * @param  Step  $step
-     * @return $this
-     */
-    public function addStep(Step $step): static
-    {
-        $this->steps[$step->getKey()] = $step;
-
-        // Set the first step as the current step if not already set
-        if ($this->currentStep === null) {
-            $this->currentStep = $step->getKey();
-        }
-
-        return $this;
-    }
-
-    /**
-     * Get all steps.
-     *
-     * @return array<string, Step>
-     */
-    public function getSteps(): array
-    {
-        return $this->steps;
-    }
-
-    /**
-     * Get a step by key.
-     *
-     * @param  string  $key
      * @return Step
-     * @throws InvalidArgumentException
      */
-    public function getStep($key): Step
+    public function getRootStep(): Step
     {
-        if (!isset($this->steps[$key])) {
-            throw new InvalidArgumentException("Step '{$key}' not found.");
-        }
-
-        return $this->steps[$key];
+        return $this->rootStep;
     }
 
     /**
-     * Get the current step.
+     * Set the root step of the wizard.
      *
-     * @return Step|null
-     */
-    public function getCurrentStep(): ?Step
-    {
-        if ($this->currentStep === null) {
-            return null;
-        }
-
-        return $this->getStep($this->currentStep);
-    }
-
-    /**
-     * Set the current step.
-     *
-     * @param  string  $key
+     * @param Step $rootStep
      * @return $this
-     * @throws InvalidArgumentException
      */
-    public function setCurrentStep($key): static
+    public function setRootStep(Step $rootStep): self
     {
-        if (!isset($this->steps[$key])) {
-            throw new InvalidArgumentException("Step '{$key}' not found.");
-        }
+        $this->rootStep = $rootStep;
 
-        $this->currentStep = $key;
+        if ($this->currentStep === null) {
+            $this->currentStep = $rootStep;
+            $this->history = [$rootStep->getKey()];
+        }
 
         return $this;
     }
 
     /**
-     * Get the current step key.
+     * Get the current step of the wizard.
      *
-     * @return string|null
+     * @return Step
      */
-    public function getCurrentStepKey(): string
+    public function getCurrentStep(): Step
     {
         return $this->currentStep;
     }
 
     /**
-     * Get the validation rules for the current step.
+     * Set the current step of the wizard.
      *
-     * @return array
+     * @param Step $currentStep
+     * @return $this
      */
-    public function getCurrentStepRules(): array
+    public function setCurrentStep(Step $currentStep): self
     {
-        if ($this->currentStep === null) {
-            return [];
-        }
+        $this->currentStep = $currentStep;
+        $this->history[] = $currentStep->getKey();
 
-        return $this->getStep($this->currentStep)->getPrefixedRules();
+        return $this;
     }
 
     /**
-     * Get the wizard data.
+     * Set the current step by key.
+     *
+     * @param string $key
+     * @return $this
+     */
+    public function setCurrentStepByKey(string $key): self
+    {
+        $step = $this->findStepByKey($key);
+
+        if ($step) {
+            $this->setCurrentStep($step);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Find a step by its key.
+     *
+     * @param string $key
+     * @param Step|null $startStep
+     * @return Step|null
+     */
+    public function findStepByKey(string $key, ?Step $startStep = null): ?Step
+    {
+        $startStep = $startStep ?? $this->rootStep;
+
+        if ($startStep->getKey() === $key) {
+            return $startStep;
+        }
+
+        foreach ($startStep->getSteps() as $step) {
+            $found = $this->findStepByKey($key, $step);
+
+            if ($found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the data collected from all steps.
      *
      * @return array
      */
@@ -248,195 +184,116 @@ class Wizard implements Wireable
     }
 
     /**
-     * Set the wizard data.
+     * Set the data collected from all steps.
      *
-     * @param  array  $data
+     * @param array $data
      * @return $this
      */
-    public function setData(array $data): static
+    public function setData(array $data): self
     {
         $this->data = $data;
-
         return $this;
     }
 
     /**
-     * Update the wizard data.
+     * Update the data with new values.
      *
-     * @param  array  $data
+     * @param array $data
      * @return $this
      */
-    public function updateData(array $data): static
+    public function updateData(array $data): self
     {
         $this->data = array_merge($this->data, $data);
-
         return $this;
     }
 
     /**
-     * Get the data for a specific step.
+     * Get the history of visited steps.
      *
-     * @param  string  $stepKey
-     * @return array
+     * @return array<string>
      */
-    public function getStepData($stepKey): array
+    public function getHistory(): array
     {
-        return isset($this->data[$stepKey]) ? $this->data[$stepKey] : [];
+        return $this->history;
     }
 
     /**
-     * Set the data for a specific step.
+     * Set the history of visited steps.
      *
-     * @param  string  $stepKey
-     * @param  array  $data
+     * @param array<string> $history
      * @return $this
      */
-    public function setStepData($stepKey, array $data): static
+    public function setHistory(array $history): self
     {
-        $this->data[$stepKey] = $data;
-
+        $this->history = $history;
         return $this;
-    }
-
-    /**
-     * Update the data for a specific step.
-     *
-     * @param  string  $stepKey
-     * @param  array  $data
-     * @return $this
-     */
-    public function updateStepData($stepKey, array $data): static
-    {
-        if (!isset($this->data[$stepKey])) {
-            $this->data[$stepKey] = [];
-        }
-
-        $this->data[$stepKey] = array_merge($this->data[$stepKey], $data);
-
-        return $this;
-    }
-
-    /**
-     * Add a transition between steps.
-     *
-     * @param  string  $fromStep
-     * @param  string  $toStep
-     * @param  Closure  $condition
-     * @return $this
-     * @throws InvalidArgumentException
-     */
-    public function addTransition($fromStep, $toStep, Closure $condition): static
-    {
-        if (!isset($this->steps[$fromStep])) {
-            throw new InvalidArgumentException("Step '{$fromStep}' not found.");
-        }
-
-        if (!isset($this->steps[$toStep])) {
-            throw new InvalidArgumentException("Step '{$toStep}' not found.");
-        }
-
-        if (!isset($this->transitions[$fromStep])) {
-            $this->transitions[$fromStep] = [];
-        }
-
-        $this->transitions[$fromStep][$toStep] = $condition;
-
-        return $this;
-    }
-
-    /**
-     * Get the next step key.
-     *
-     * @return string|null
-     */
-    public function getNextStepKey(): ?string
-    {
-        if ($this->currentStep === null) {
-            return null;
-        }
-
-        // Check if a flow callback is set
-        if ($this->flowCallback !== null) {
-            $callback = $this->flowCallback;
-            $nextStep = $callback($this->currentStep, $this->data);
-            if ($nextStep !== null && isset($this->steps[$nextStep])) {
-                return $nextStep;
-            }
-        }
-
-        // Check for custom transitions
-        if (isset($this->transitions[$this->currentStep])) {
-            foreach ($this->transitions[$this->currentStep] as $toStep => $condition) {
-                if ($condition($this->data)) {
-                    return $toStep;
-                }
-            }
-        }
-
-        // Default to the next step in the sequence
-        $keys = array_keys($this->steps);
-        $currentIndex = array_search($this->currentStep, $keys);
-
-        if ($currentIndex !== false && $currentIndex < count($keys) - 1) {
-            return $keys[$currentIndex + 1];
-        }
-
-        return null;
-    }
-
-    /**
-     * Get the previous step key.
-     *
-     * @return string|null
-     */
-    public function getPreviousStepKey(): ?string
-    {
-        if ($this->currentStep === null) {
-            return null;
-        }
-
-        $keys = array_keys($this->steps);
-        $currentIndex = array_search($this->currentStep, $keys);
-
-        if ($currentIndex !== false && $currentIndex > 0) {
-            return $keys[$currentIndex - 1];
-        }
-
-        return null;
     }
 
     /**
      * Move to the next step.
      *
-     * @return bool Whether the step was changed
+     * @return $this
      */
-    public function nextStep(): bool
+    public function nextStep(): self
     {
-        $nextStepKey = $this->getNextStepKey();
+        $currentStepChildren = $this->currentStep->getSteps();
 
-        if ($nextStepKey !== null) {
-            $this->currentStep = $nextStepKey;
-            return true;
+        if (empty($currentStepChildren)) {
+            // If no children, try to move to the next sibling or parent's next sibling
+            $parent = $this->currentStep->getParent();
+
+            if ($parent) {
+                $siblings = $parent->getSteps();
+                $currentIndex = array_search($this->currentStep, $siblings);
+
+                if ($currentIndex !== false && isset($siblings[$currentIndex + 1])) {
+                    // Move to next sibling
+                    $this->setCurrentStep($siblings[$currentIndex + 1]);
+                } else {
+                    // Try to move to parent's next sibling
+                    $this->setCurrentStep($parent);
+                    $this->nextStep();
+                }
+            }
+        } else {
+            // If has children, move to first child
+            $nextStep = $this->currentStep->resolveNextStep(
+                $this->currentStep,
+                $this->data,
+                $currentStepChildren[0]
+            );
+
+            if ($nextStep) {
+                $this->setCurrentStep($nextStep);
+            }
         }
 
-        return false;
+        return $this;
     }
 
     /**
      * Move to the previous step.
      *
-     * @return bool Whether the step was changed
+     * @return $this
      */
-    public function previousStep(): bool
+    public function previousStep(): self
     {
-        $previousStepKey = $this->getPreviousStepKey();
+        if (count($this->history) > 1) {
+            // Remove current step from history
+            array_pop($this->history);
 
-        if ($previousStepKey !== null) {
-            $this->currentStep = $previousStepKey;
-            return true;
+            // Get the previous step key
+            $previousStepKey = end($this->history);
+
+            // Find and set the previous step
+            $previousStep = $this->findStepByKey($previousStepKey);
+
+            if ($previousStep) {
+                $this->currentStep = $previousStep;
+            }
         }
 
-        return false;
+        return $this;
     }
 
     /**
@@ -446,12 +303,7 @@ class Wizard implements Wireable
      */
     public function isFirstStep(): bool
     {
-        if ($this->currentStep === null) {
-            return false;
-        }
-
-        $keys = array_keys($this->steps);
-        return $this->currentStep === reset($keys);
+        return $this->currentStep->getKey() === $this->rootStep->getKey();
     }
 
     /**
@@ -461,63 +313,147 @@ class Wizard implements Wireable
      */
     public function isLastStep(): bool
     {
-        if ($this->currentStep === null) {
+        // A step is considered the last step if it has no children
+        // or if it's the last child of its parent and the parent has no next sibling
+        $currentStepChildren = $this->currentStep->getSteps();
+
+        if (!empty($currentStepChildren)) {
             return false;
         }
 
-        $keys = array_keys($this->steps);
-        return $this->currentStep === end($keys);
-    }
+        $parent = $this->currentStep->getParent();
 
-    final protected static function serializeTransitions(array $data): array
-    {
-        $transitions = [];
-
-        foreach ($data as $stepKey => $transition) {
-            foreach ($transition as $transitionKey => $condition) {
-                $transitions[] = [$stepKey, $transitionKey, serialize(new SerializableClosure($condition))];
-            }
+        if (!$parent) {
+            return true;
         }
 
-        return $transitions;
+        $siblings = $parent->getSteps();
+        $currentIndex = array_search($this->currentStep, $siblings);
+
+        return $currentIndex !== false && $currentIndex === count($siblings) - 1;
     }
 
-    final protected static function unserializeTransitions(array $data): array
+    /**
+     * Get the name of the wizard.
+     *
+     * @return string
+     */
+    public function getName(): string
     {
-        $transitions = [];
-
-        foreach ($data as $stepKey => $transition) {
-            foreach ($transition as $transitionKey => $condition) {
-                $transitions[$stepKey][$transitionKey] = unserialize(
-                    $condition
-                )->getClosure();
-            }
-        }
-
-        return $transitions;
+        return $this->name;
     }
 
-    public function toLivewire(): array
+    /**
+     * Set the name of the wizard.
+     *
+     * @param string $name
+     * @return $this
+     */
+    public function setName(string $name): self
+    {
+        $this->name = $name;
+        return $this;
+    }
+
+    /**
+     * Set the name of the wizard (alias for setName).
+     *
+     * @param string $name
+     * @return $this
+     */
+    public function name(string $name): self
+    {
+        return $this->setName($name);
+    }
+
+    /**
+     * Set the steps of the wizard.
+     *
+     * @param array<Step> $steps
+     * @return $this
+     */
+    public function steps(array $steps): self
+    {
+        $this->rootStep->setSteps($steps);
+        return $this;
+    }
+
+    /**
+     * Get the flow resolver for the wizard.
+     *
+     * @return \Closure|null
+     */
+    public function getFlowResolver(): ?\Closure
+    {
+        return $this->flowResolver;
+    }
+
+    /**
+     * Set the flow resolver for the wizard.
+     *
+     * @param \Closure $flowResolver
+     * @return $this
+     */
+    public function setFlowResolver(\Closure $flowResolver): self
+    {
+        $this->flowResolver = $flowResolver;
+        return $this;
+    }
+
+    /**
+     * Set the flow resolver for the wizard (alias for setFlowResolver).
+     *
+     * @param \Closure $flowResolver
+     * @return $this
+     */
+    public function flow(\Closure $flowResolver): self
+    {
+        return $this->setFlowResolver($flowResolver);
+    }
+
+    /**
+     * Convert the wizard to a Livewire-compatible format.
+     *
+     * @return array
+     */
+    public function toLivewire()
     {
         return [
-            'name' => $this->name,
-            'steps' => $this->steps,
-            'transitions' => static::serializeTransitions($this->transitions),
-            'currentStep' => $this->currentStep,
+            'rootStep' => $this->rootStep->toLivewire(),
+            'currentStepKey' => $this->currentStep->getKey(),
             'data' => $this->data,
-            'flowCallback' => serialize(new SerializableClosure($this->flowCallback)),
+            'history' => $this->history,
+            'name' => $this->name,
         ];
     }
 
-    public static function fromLivewire($value): static
+    /**
+     * Create a wizard from a Livewire-compatible format.
+     *
+     * @param array $value
+     * @return static
+     */
+    public static function fromLivewire($value)
     {
-        return new static(
-            $value['name'],
-            $value['steps'],
-            static::unserializeTransitions($value['transitions']),
-            $value['currentStep'],
-            $value['data'],
-            unserialize($value['flowCallback'])->getClosure()
-        );
+        $rootStep = Step::fromLivewire($value['rootStep']);
+        $wizard = new static($rootStep);
+
+        $wizard->setData($value['data'] ?? []);
+        $wizard->setHistory($value['history'] ?? [$rootStep->getKey()]);
+
+        if (isset($value['name'])) {
+            $wizard->setName($value['name']);
+        }
+
+        // Set the current step
+        if (isset($value['currentStepKey'])) {
+            $currentStep = $wizard->findStepByKey($value['currentStepKey']);
+
+            if ($currentStep) {
+                $wizard->currentStep = $currentStep;
+            }
+        }
+
+        return $wizard;
     }
 }

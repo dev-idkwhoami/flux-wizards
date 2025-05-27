@@ -1,14 +1,13 @@
 # Flux Wizard
 
-A Laravel package that provides functionality for building wizard-style multi-step forms.
+A Laravel package that provides functionality for building tree-based wizard-style multi-step forms.
 
 ## Features
 
-- Define steps, their validation rules, and the flow between steps
+- Tree-based system for organizing wizard steps
 - Fluent, chainable API for defining wizards and steps
-- Namespace each step's data in an array using the step's key (e.g. ['account' => ['email' => '...']])
-- Automatic prefixing of validation rules based on step keys (e.g. account.email => required|email)
-- Conditional step flow using closure-based logic or a global flow callback
+- Each step can hold an array of child steps
+- Conditional step flow using closure-based logic
 - Persistent state across steps
 - Livewire integration with the HasWizard trait
 
