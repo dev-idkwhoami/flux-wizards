@@ -34,8 +34,8 @@ To create a wizard, use the `HasWizard` trait in your Livewire component and imp
 
 namespace App\Http\Livewire;
 
-use Idkwhoami\FluxWizards\Core\Step;
-use Idkwhoami\FluxWizards\Core\Wizard;
+use Idkwhoami\FluxWizards\Concretes\Step;
+use Idkwhoami\FluxWizards\Concretes\Wizard;
 use Idkwhoami\FluxWizards\Traits\HasWizard;
 use Livewire\Component;
 

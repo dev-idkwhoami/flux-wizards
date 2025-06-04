@@ -2,9 +2,10 @@
 
 namespace Idkwhoami\FluxWizards\Traits;
 
-use Idkwhoami\FluxWizards\Core\Wizard;
+use Idkwhoami\FluxWizards\Concretes\Wizard;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Session;
 use Livewire\Component;
 
 /**
@@ -19,14 +20,29 @@ trait HasWizard
      */
     #[Locked] public Wizard $wizard;
 
+    public array $data = [];
+
     /**
      * Initialize the component.
      *
      * @return void
      */
-    public function mountHasWizard(): void
+    public function bootHasWizard(): void
     {
         $this->wizard = $this->createWizard();
+        $this->wizard->boot();
+
+        $this->data = $this->wizard->getData();
+    }
+
+    public function updated(string $propertyName, $value): void
+    {
+        dump($propertyName, $value);
+    }
+
+    public function updatedData(): void
+    {
+        $this->wizard->setData($this->data);
     }
 
     /**
@@ -43,7 +59,7 @@ trait HasWizard
      */
     public function nextStep(): void
     {
-        $this->wizard->nextStep();
+        $this->wizard->next();
     }
 
     /**
@@ -53,38 +69,12 @@ trait HasWizard
      */
     public function previousStep(): void
     {
-        $this->wizard->previousStep();
+        $this->wizard->previous();
     }
 
-    /**
-     * Go to a specific step.
-     *
-     * @param string $stepKey
-     * @return void
-     */
-    public function goToStep($stepKey): void
+    public function hasErrors(): bool
     {
-        $this->wizard->setCurrentStepByKey($stepKey);
-    }
-
-    /**
-     * Check if the wizard is on the first step.
-     *
-     * @return bool
-     */
-    public function isFirstStep(): bool
-    {
-        return $this->wizard->isFirstStep();
-    }
-
-    /**
-     * Check if the wizard is on the last step.
-     *
-     * @return bool
-     */
-    public function isLastStep(): bool
-    {
-        return $this->wizard->isLastStep();
+        return $this->wizard->getRoot()->hasErrors();
     }
 
     /**
@@ -94,12 +84,9 @@ trait HasWizard
      */
     public function renderWizard(): View
     {
-        $currentStep = $this->wizard->getCurrentStep();
-
         return view('flux-wizards::wizard', [
-            'currentStep' => $currentStep,
-            'isFirstStep' => $this->isFirstStep(),
-            'isLastStep' => $this->isLastStep(),
+            'wizard' => $this->wizard,
+            'errors' => $this->wizard->getRoot()->getErrors(),
         ]);
     }
 
