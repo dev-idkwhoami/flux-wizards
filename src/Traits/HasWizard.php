@@ -2,10 +2,7 @@
 
 namespace Idkwhoami\FluxWizards\Traits;
 
-use Idkwhoami\FluxWizards\Concretes\Wizard;
-use Illuminate\Contracts\View\View;
-use Livewire\Attributes\Locked;
-use Livewire\Attributes\Session;
+
 use Livewire\Component;
 
 /**
@@ -13,85 +10,42 @@ use Livewire\Component;
  */
 trait HasWizard
 {
-    /**
-     * The wizard instance.
-     *
-     * @var Wizard
-     */
-    #[Locked] public Wizard $wizard;
+    public ?string $currentStep = null;
 
-    public array $data = [];
-
-    /**
-     * Initialize the component.
-     *
-     * @return void
-     */
     public function bootHasWizard(): void
     {
-        $this->wizard = $this->createWizard();
-        $this->wizard->boot();
+        if (!in_array(Component::class, class_parents($this))) {
+            throw new \Exception('The trait '.__TRAIT__.' must be used on a class that implements '.Component::class);
+        }
 
-        $this->data = $this->wizard->getData();
+        $this->currentStep = $this->initialStep();
     }
 
-    public function updated(string $propertyName, $value): void
+    abstract protected function steps(): array;
+
+    abstract protected function initialStep(): string;
+
+    public final function next(): void
     {
-        dump($propertyName, $value);
+        $stepCount = count($this->steps());
+        $currentKey = array_find($this->steps(), fn ($step) => $step === $this->currentStep);
+        $currentKey += 1;
+        $cappedKey = max(0, min($stepCount - 1, $currentKey));
+
+        $this->currentStep = $this->computeNextStep($this->steps()[$cappedKey]);
     }
 
-    public function updatedData(): void
+    public final function previous(): void
     {
-        $this->wizard->setData($this->data);
+        $stepCount = count($this->steps());
+        $currentKey = array_find($this->steps(), fn ($step) => $step === $this->currentStep);
+        $currentKey -= 1;
+        $cappedKey = max(0, min($stepCount - 1, $currentKey));
+
+        $this->currentStep = $this->computePreviousStep($this->steps()[$cappedKey]);
     }
 
-    /**
-     * Create the wizard instance.
-     *
-     * @return Wizard
-     */
-    abstract protected function createWizard(): Wizard;
+    abstract public function computeNextStep(string $next): string;
 
-    /**
-     * Move to the next step.
-     *
-     * @return void
-     */
-    public function nextStep(): void
-    {
-        $this->wizard->next();
-    }
-
-    /**
-     * Move to the previous step.
-     *
-     * @return void
-     */
-    public function previousStep(): void
-    {
-        $this->wizard->previous();
-    }
-
-    public function hasErrors(): bool
-    {
-        return $this->wizard->getRoot()->hasErrors();
-    }
-
-    /**
-     * Render the wizard component.
-     *
-     * @return \Illuminate\View\View
-     */
-    public function renderWizard(): View
-    {
-        return view('flux-wizards::wizard', [
-            'wizard' => $this->wizard,
-            'errors' => $this->wizard->getRoot()->getErrors(),
-        ]);
-    }
-
-    final public function render(): View
-    {
-        return $this->renderWizard();
-    }
+    abstract public function computePreviousStep(string $previous): string;
 }
