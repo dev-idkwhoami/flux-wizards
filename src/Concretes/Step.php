@@ -104,35 +104,22 @@ class Step extends Makeable implements Wireable
 
     public function validate(array $data): bool
     {
-        dump([
-            $data,
-            $this->validationRules
-        ]);
+        $validator = Validator::make($data[$this->name], $this->validationRules);
 
-        $validationKeys = array_map(
-            fn(string $key) => substr($key, strpos($key, 'data.') + 5) ?: $key,
-            array_keys($this->validationRules)
-        );
-
-        $stepData = array_filter(
-            Arr::dot($data),
-            function(string $key) use ($validationKeys) {
-                dump(substr($key, strrpos($key, '.') + 1));
-                return in_array(
-                    "{$this->name}." . substr($key, strrpos($key, '.') + 1),
-                    $validationKeys
-                );
-            } ,
-            ARRAY_FILTER_USE_KEY
-        );
-
-        $validator = Validator::make($stepData, $this->validationRules);
         $validator->validate();
 
-        if ($validator->fails()) {
-            $this->propagateErrors($validator->errors());
+        /*if($validator->fails()) {
+            $errors = new MessageBag();
+
+            foreach ($validator->errors()->getMessages() as $key => $messages) {
+                foreach ($messages as $message) {
+                    $errors->add("data.$this->name.$key", $message);
+                }
+            }
+
+            $this->propagateErrors($errors);
             return false;
-        }
+        }*/
 
         return true;
     }
@@ -141,15 +128,13 @@ class Step extends Makeable implements Wireable
     {
         $childCount = count($this->children);
 
-        if (!$this->flow && $childCount !== 1) {
+        if (!$this->flow && $childCount > 1) {
             throw new \Exception("Flow is not defined but step has more than one child.");
         }
 
         if (!$this->flow && $childCount === 1) {
             return $this->children[0];
         }
-
-        dump($this, $data);
 
         $flowMatches = array_filter($this->children,
             fn(Step $child) => $this->flow->call($this, $this, Arr::dot($data), $child));
@@ -177,9 +162,10 @@ class Step extends Makeable implements Wireable
      */
     public function rules(array $rules): Step
     {
-        foreach ($rules as $key => $rule) {
+        /*foreach ($rules as $key => $rule) {
             $this->validationRules["data.{$this->name}.$key"] = $rule;
-        }
+        }*/
+        $this->validationRules = $rules;
 
         return $this;
     }

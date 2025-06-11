@@ -5,7 +5,6 @@ namespace Idkwhoami\FluxWizards\Traits;
 use Idkwhoami\FluxWizards\Concretes\Wizard;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\Session;
 use Livewire\Component;
 
 /**
@@ -32,13 +31,13 @@ trait HasWizard
         $this->wizard = $this->createWizard();
         $this->wizard->boot();
 
-        $this->data = $this->wizard->getData();
+        $this->wizard->setData($this->data);
     }
 
-    public function updated(string $propertyName, $value): void
+    /*public function updated(string $propertyName, $value): void
     {
         dump($propertyName, $value);
-    }
+    }*/
 
     public function updatedData(): void
     {
@@ -52,6 +51,8 @@ trait HasWizard
      */
     abstract protected function createWizard(): Wizard;
 
+    abstract protected function complete(array $data): void;
+
     /**
      * Move to the next step.
      *
@@ -59,7 +60,11 @@ trait HasWizard
      */
     public function nextStep(): void
     {
-        $this->wizard->next();
+        if($this->wizard->getCurrent()->isLast()) {
+            $this->complete($this->data);
+        } else {
+            $this->wizard->next();
+        }
     }
 
     /**
@@ -86,7 +91,6 @@ trait HasWizard
     {
         return view('flux-wizards::wizard', [
             'wizard' => $this->wizard,
-            'errors' => $this->wizard->getRoot()->getErrors(),
         ]);
     }
 

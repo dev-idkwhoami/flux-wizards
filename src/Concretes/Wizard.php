@@ -13,12 +13,6 @@ class Wizard extends Makeable implements Wireable
 
     protected array $data = [];
 
-    public function boot(): void
-    {
-        $this->data = Session::get($this->sessionKey('data'), []);
-        $this->current = Session::get($this->sessionKey('current'), $this->root?->getName());
-    }
-
     public function next(): bool
     {
         if (!$this->getCurrent()->validate($this->data)) {
@@ -103,7 +97,7 @@ class Wizard extends Makeable implements Wireable
     public function setData(array $data): void
     {
         $this->data = array_merge($this->data, $data);
-        Session::put($this->sessionKey('data'), $this->data);
+        /*Session::put($this->sessionKey('data'), $this->data);*/
     }
 
     public function root(Step $root): Wizard
@@ -122,7 +116,8 @@ class Wizard extends Makeable implements Wireable
      */
     public function getData(): array
     {
-        return Session::get($this->sessionKey('data'), $this->data);
+        return $this->data;
+        /*return Session::get($this->sessionKey('data'), $this->data);*/
     }
 
     protected function sessionKey(string $key): string
