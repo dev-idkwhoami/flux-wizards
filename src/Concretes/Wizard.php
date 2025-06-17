@@ -7,10 +7,13 @@ use Livewire\Wireable;
 
 class Wizard extends Makeable implements Wireable
 {
-    protected ?Step $root = null;
+    protected Step $root;
     protected ?string $current = null;
-    protected ?string $directory = 'steps';
+    protected string $directory = 'steps';
 
+    /**
+     * @var array<string, mixed> $data
+     */
     protected array $data = [];
 
     public function next(): bool
@@ -32,13 +35,20 @@ class Wizard extends Makeable implements Wireable
         return !is_null($previous);
     }
 
+    /**
+     * @return Step
+     */
     public function getCurrent(): Step
     {
         if (is_null($this->current)) {
             return $this->root;
         }
 
-        return $this->findByName($this->current);
+        $step = $this->findByName($this->current);
+
+        throw_if(!$step, new \Exception("No step with a matching name was found."));
+
+        return $step;
     }
 
     /**
@@ -49,7 +59,11 @@ class Wizard extends Makeable implements Wireable
         $this->current = $current;
     }
 
-    protected function findByName(string $name): Step
+    /**
+     * @param  string  $name
+     * @return Step|null
+     */
+    protected function findByName(string $name): ?Step
     {
         $searchStep = function (Step $step) use (&$searchStep, $name): ?Step {
             if ($step->getName() === $name) {
@@ -93,52 +107,77 @@ class Wizard extends Makeable implements Wireable
         return array_map(fn (Step $step) => $step->getName(), $this->getAllSteps());
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return void
+     */
     public function setData(array $data): void
     {
         $this->data = array_merge($this->data, $data);
     }
 
+    /**
+     * @param  Step  $root
+     * @return $this
+     */
     public function root(Step $root): Wizard
     {
         $this->root = $root;
         return $this;
     }
 
+    /**
+     * @return Step|null
+     */
     public function getRoot(): ?Step
     {
         return $this->root;
     }
 
     /**
-     * @return array
+     * @return array<string, mixed>
      */
     public function getData(): array
     {
         return $this->data;
     }
 
-    public function directory(?string $directory): Wizard
+    /**
+     * @param  string  $directory
+     * @return $this
+     */
+    public function directory(string $directory): Wizard
     {
         $this->directory = $directory;
         return $this;
     }
 
-    public function getDirectory(): ?string
+    /**
+     * @return string
+     */
+    public function getDirectory(): string
     {
         return $this->directory;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toLivewire(): array
     {
         return [
             'name' => $this->name,
             'current' => $this->current,
-            'directory' =>  $this->directory,
+            'directory' => $this->directory,
             'root' => $this->root,
             'data' => $this->data,
         ];
     }
 
+    /**
+     * @param  array<string, mixed>  $value
+     * @return Wizard
+     */
     public static function fromLivewire($value): Wizard
     {
         return (new static($value['name']))

@@ -2,7 +2,6 @@
 
 namespace Idkwhoami\FluxWizards;
 
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 
 class FluxWizardsServiceProvider extends ServiceProvider
@@ -11,18 +10,13 @@ class FluxWizardsServiceProvider extends ServiceProvider
     {
         $this->prepareLocalization();
 
-        Blade::directive('step', function (string $expression) {
-            return "<?php if (isset(\$this->currentStep) && \$this->currentStep === {$expression}): ?>";
-        });
-
-        Blade::directive('endstep', function () {
-            return "<?php endif; ?>";
-        });
-
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'flux-wizards');
 
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/flux-wizards'),
+        ], [
+            'flux-wizards-views',
+            'flux-wizards'
         ]);
     }
 

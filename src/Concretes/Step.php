@@ -84,7 +84,7 @@ class Step extends Makeable implements Wireable
     }
 
     /**
-     * @return array
+     * @return Step[]
      */
     public function getChildren(): array
     {
@@ -101,6 +101,10 @@ class Step extends Makeable implements Wireable
         $this->parent->propagateErrors($errors);
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return bool
+     */
     public function validate(array $data): bool
     {
         $validator = Validator::make($data[$this->name], $this->validationRules);
@@ -109,6 +113,11 @@ class Step extends Makeable implements Wireable
         return true;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return Step|null
+     * @throws \Exception
+     */
     public function resolveNext(array $data): ?Step
     {
         $childCount = count($this->children);
@@ -121,8 +130,12 @@ class Step extends Makeable implements Wireable
             return $this->children[0];
         }
 
-        $flowMatches = array_filter($this->children,
-            fn(Step $child) => $this->flow->call($this, $this, Arr::dot($data), $child));
+        throw_if(!$this->flow, new \Exception("Flow is null but should be set."));
+
+        $flowMatches = array_filter(
+            $this->children,
+            fn (Step $child) => $this->flow->call($this, $this, Arr::dot($data), $child)
+        );
 
         if (count($flowMatches) !== 1) {
             throw new \Exception("Flow can not match more or less than one child.");
@@ -131,6 +144,10 @@ class Step extends Makeable implements Wireable
         return $flowMatches[0];
     }
 
+    /**
+     * @param  Step[]  $children
+     * @return $this
+     */
     public function children(array $children): Step
     {
         $this->children = $this->injectParentStep($children);
@@ -169,7 +186,7 @@ class Step extends Makeable implements Wireable
      *
      * <b>Warning</b>: The passed closure will be called for each child, do not call anything besides the flow logic within the closure.
      *
-     * @param  Closure(Step, array, Step): bool  $flow
+     * @param  Closure(Step $current, array<string, mixed> $data, Step $child): bool $flow
      * @return $this
      */
     public function flow(Closure $flow): Step
@@ -178,29 +195,47 @@ class Step extends Makeable implements Wireable
         return $this;
     }
 
+    /**
+     * @param  string  $label
+     * @return $this
+     */
     public function label(string $label): Step
     {
         $this->label = $label;
         return $this;
     }
 
+    /**
+     * @param  string  $view
+     * @return $this
+     */
     public function view(string $view): Step
     {
         $this->view = $view;
         return $this;
     }
 
+    /**
+     * @param  Step[]  $children
+     * @return Step[]
+     */
     protected function injectParentStep(array $children): array
     {
-        array_walk($children, fn(Step $child) => $child->parent = $this);
+        array_walk($children, fn (Step $child) => $child->parent = $this);
         return $children;
     }
 
+    /**
+     * @return void
+     */
     public function filled(): void
     {
         $this->children = $this->injectParentStep($this->children);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toLivewire(): array
     {
         return [
@@ -214,6 +249,10 @@ class Step extends Makeable implements Wireable
         ];
     }
 
+    /**
+     * @param array<string, mixed> $value
+     * @return Step
+     */
     public static function fromLivewire($value): Step
     {
         return (new static(
