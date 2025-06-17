@@ -3,13 +3,13 @@
 namespace Idkwhoami\FluxWizards\Concretes;
 
 use Idkwhoami\FluxWizards\Abstracts\Makeable;
-use Illuminate\Support\Facades\Session;
 use Livewire\Wireable;
 
 class Wizard extends Makeable implements Wireable
 {
     protected ?Step $root = null;
     protected ?string $current = null;
+    protected ?string $directory = 'steps';
 
     protected array $data = [];
 
@@ -44,10 +44,9 @@ class Wizard extends Makeable implements Wireable
     /**
      * @param  string|null  $current
      */
-    protected function setCurrent(?string $current): void
+    public function setCurrent(?string $current): void
     {
         $this->current = $current;
-        Session::put($this->sessionKey('current'), $current);
     }
 
     protected function findByName(string $name): Step
@@ -97,7 +96,6 @@ class Wizard extends Makeable implements Wireable
     public function setData(array $data): void
     {
         $this->data = array_merge($this->data, $data);
-        /*Session::put($this->sessionKey('data'), $this->data);*/
     }
 
     public function root(Step $root): Wizard
@@ -117,12 +115,17 @@ class Wizard extends Makeable implements Wireable
     public function getData(): array
     {
         return $this->data;
-        /*return Session::get($this->sessionKey('data'), $this->data);*/
     }
 
-    protected function sessionKey(string $key): string
+    public function directory(?string $directory): Wizard
     {
-        return "flux-wizards::wizard::{$this->name}::$key";
+        $this->directory = $directory;
+        return $this;
+    }
+
+    public function getDirectory(): ?string
+    {
+        return $this->directory;
     }
 
     public function toLivewire(): array
@@ -130,6 +133,7 @@ class Wizard extends Makeable implements Wireable
         return [
             'name' => $this->name,
             'current' => $this->current,
+            'directory' =>  $this->directory,
             'root' => $this->root,
             'data' => $this->data,
         ];

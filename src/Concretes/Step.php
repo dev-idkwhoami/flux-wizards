@@ -4,7 +4,6 @@ namespace Idkwhoami\FluxWizards\Concretes;
 
 use Closure;
 use Idkwhoami\FluxWizards\Abstracts\Makeable;
-use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\MessageBag;
@@ -105,21 +104,7 @@ class Step extends Makeable implements Wireable
     public function validate(array $data): bool
     {
         $validator = Validator::make($data[$this->name], $this->validationRules);
-
         $validator->validate();
-
-        /*if($validator->fails()) {
-            $errors = new MessageBag();
-
-            foreach ($validator->errors()->getMessages() as $key => $messages) {
-                foreach ($messages as $message) {
-                    $errors->add("data.$this->name.$key", $message);
-                }
-            }
-
-            $this->propagateErrors($errors);
-            return false;
-        }*/
 
         return true;
     }
@@ -205,21 +190,15 @@ class Step extends Makeable implements Wireable
         return $this;
     }
 
-    public function render(array $data): View
-    {
-        $view = $this->view ?? "steps.{$this->name}";
-
-        return view($view, [
-            'step' => $this,
-            'data' => $data,
-            'next' => $this->resolveNext($data),
-        ]);
-    }
-
     protected function injectParentStep(array $children): array
     {
         array_walk($children, fn(Step $child) => $child->parent = $this);
         return $children;
+    }
+
+    public function filled(): void
+    {
+        $this->children = $this->injectParentStep($this->children);
     }
 
     public function toLivewire(): array
@@ -228,6 +207,7 @@ class Step extends Makeable implements Wireable
             'name' => $this->name,
             'label' => $this->label,
             'view' => $this->view,
+            'validationRules' => $this->validationRules,
 
             'flow' => is_null($this->flow) ? null : serialize(new SerializableClosure($this->flow)),
             'children' => $this->children,

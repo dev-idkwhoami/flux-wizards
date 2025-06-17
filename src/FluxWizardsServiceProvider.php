@@ -9,13 +9,21 @@ class FluxWizardsServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        $this->prepareLocalization();
+
         Blade::directive('step', function (string $expression) {
             return "<?php if (isset(\$this->currentStep) && \$this->currentStep === {$expression}): ?>";
         });
 
-        Blade::directive('end-step', function ($expression) {
+        Blade::directive('endstep', function () {
             return "<?php endif; ?>";
         });
+
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'flux-wizards');
+
+        $this->publishes([
+            __DIR__.'/../resources/views' => resource_path('views/vendor/flux-wizards'),
+        ]);
     }
 
     /**
@@ -26,6 +34,21 @@ class FluxWizardsServiceProvider extends ServiceProvider
     public function register()
     {
         //
+    }
+
+    /**
+     * @return void
+     */
+    public function prepareLocalization(): void
+    {
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'flux-wizards');
+
+        $this->publishes([
+            __DIR__.'/../lang' => lang_path('vendor/flux-wizards'),
+        ], [
+            'flux-wizards-lang',
+            'flux-wizards'
+        ]);
     }
 
 }

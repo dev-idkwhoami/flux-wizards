@@ -2,11 +2,31 @@
 
 A Laravel package that provides functionality for building wizard-style multi-step forms with Livewire Flux.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Usage](#usage)
+  - [Quick Start](#quick-start)
+  - [Creating a Wizard](#creating-a-wizard)
+  - [Required Methods](#required-methods)
+  - [Navigation Methods](#navigation-methods)
+  - [Creating Step Views](#creating-step-views)
+  - [Blade Directives](#blade-directives)
+  - [Customizing the Wizard View](#customizing-the-wizard-view)
+  - [Localization](#localization)
+- [API Reference](#api-reference)
+  - [Wizard Class](#wizard-class)
+  - [Step Class](#step-class)
+- [License](#license)
+
 ## Features
 
-- Simple, straightforward API for defining wizard steps
+- Object-oriented API for defining wizard steps and their relationships
 - Navigation between steps with next() and previous() methods
-- Custom logic for determining step flow
+- Custom flow logic for determining step progression
+- Validation rules for each step
 - Blade directives for conditional step rendering
 - Livewire integration with the HasWizard trait
 - Designed for use with Livewire Flux
@@ -26,10 +46,50 @@ The package will automatically register its service provider.
 - PHP 8.3+
 - Laravel 11+
 - Livewire Flux 2.1+
+- Livewire Flux Pro 2.1+
 
 ## Usage
 
-This package provides a simple way to create multi-step wizards in your Laravel application using Livewire. Below is a comprehensive example of how to use the package.
+### Quick Start
+
+To quickly implement a wizard in your Livewire component:
+
+1. Add the `HasWizard` trait to your Livewire component
+2. Implement the required `createWizard()` and `complete()` methods
+3. Create views for each step in your wizard
+4. Use the navigation methods `nextStep()` and `previousStep()` for moving between steps
+
+```php
+use Idkwhoami\FluxWizards\Concretes\Step;
+use Idkwhoami\FluxWizards\Concretes\Wizard;
+use Idkwhoami\FluxWizards\Traits\HasWizard;
+use Livewire\Component;
+
+class MyWizard extends Component
+{
+    use HasWizard;
+
+    public array $data = [];
+
+    protected function createWizard(): Wizard
+    {
+        $step1 = Step::make('step1')->label('First Step');
+        $step2 = Step::make('step2')->label('Second Step');
+
+        $step1->children([$step2]);
+
+        return Wizard::make('my-wizard')
+            ->root($step1)
+            ->directory('wizards.my-wizard');
+    }
+
+    protected function complete(array $data): void
+    {
+        // Process the collected data
+        session()->flash('message', 'Wizard completed!');
+    }
+}
+```
 
 ### Creating a Wizard
 
@@ -40,6 +100,8 @@ To create a wizard, use the `HasWizard` trait in your Livewire component and imp
 
 namespace App\Livewire;
 
+use Idkwhoami\FluxWizards\Concretes\Step;
+use Idkwhoami\FluxWizards\Concretes\Wizard;
 use Idkwhoami\FluxWizards\Traits\HasWizard;
 use Livewire\Component;
 
@@ -47,45 +109,80 @@ class UserRegistrationWizard extends Component
 {
     use HasWizard;
 
-    protected function initialStep(): string
+    // Data that will be collected through the wizard
+    public array $data = [
+        'account' => [],
+        'profile' => [],
+        'billing' => [],
+    ];
+
+    /**
+     * Create the wizard instance.
+     *
+     * @return Wizard
+     */
+    protected function createWizard(): Wizard
     {
-        return 'account';
+        // Create the root step
+        $accountStep = Step::make('account')
+            ->label('Account Information')
+            ->rules([
+                'email' => 'required|email',
+                'password' => 'required|min:8',
+            ]);
+
+        // Create child steps
+        $profileStep = Step::make('profile')
+            ->label('Profile Information')
+            ->rules([
+                'name' => 'required',
+                'bio' => 'nullable',
+            ]);
+
+        $billingStep = Step::make('billing')
+            ->label('Billing Information')
+            ->rules([
+                'card_number' => 'required|numeric',
+                'expiry' => 'required',
+            ]);
+
+        // Define custom flow logic (optional)
+        $accountStep->flow(function(Step $current, array $data, Step $next) {
+            // Skip billing if user is on a free plan
+            if ($next->is('billing') && ($data['account.plan'] ?? '') === 'free') {
+                return false;
+            }
+
+            return true;
+        });
+
+        // Set up the step hierarchy
+        $accountStep->children([
+            $profileStep->children([
+                $billingStep
+            ])
+        ]);
+
+        // Create and return the wizard
+        return Wizard::make('user-registration')
+            ->root($accountStep)
+            ->directory('wizards.user-registration'); // Directory where step views are stored
     }
 
-    protected function steps(): array
+    /**
+     * Handle completion of the wizard.
+     *
+     * @param array $data
+     * @return void
+     */
+    protected function complete(array $data): void
     {
-        return [
-            'account',
-            'profile',
-            'billing',
-        ];
-    }
+        // Process the collected data
+        // For example, create a user, set up billing, etc.
 
-    public function computeNextStep(string $next): string
-    {
-        // Custom logic to determine the next step
-        // For example, skip billing if user is on a free plan
-        if ($next === 'billing' && $this->isFreePlan) {
-            return 'confirmation';
-        }
-
-        return $next;
-    }
-
-    public function computePreviousStep(string $previous): string
-    {
-        // Custom logic to determine the previous step
-        // For example, skip billing if user is on a free plan
-        if ($previous === 'billing' && $this->isFreePlan) {
-            return 'profile';
-        }
-
-        return $previous;
-    }
-
-    public function render()
-    {
-        return view('livewire.user-registration-wizard');
+        // Redirect or show a success message
+        session()->flash('message', 'Registration completed successfully!');
+        $this->redirect('/dashboard');
     }
 }
 ```
@@ -94,180 +191,144 @@ class UserRegistrationWizard extends Component
 
 When using the `HasWizard` trait, you must implement the following methods:
 
-1. `initialStep()`: Returns the key of the first step in your wizard.
-2. `steps()`: Returns an array of step keys in the order they should appear.
-3. `computeNextStep(string $next)`: Allows you to customize the next step logic.
-4. `computePreviousStep(string $previous)`: Allows you to customize the previous step logic.
+1. `createWizard()`: Returns a configured Wizard instance with steps.
+2. `complete(array $data)`: Handles the final submission when all steps are completed.
 
 ### Navigation Methods
 
 The `HasWizard` trait provides two methods for navigating between steps:
 
-1. `next()`: Move to the next step in the sequence.
-2. `previous()`: Move to the previous step in the sequence.
+1. `nextStep()`: Move to the next step in the sequence or complete the wizard if on the last step.
+2. `previousStep()`: Move to the previous step in the sequence.
 
-### Creating the Wizard View
+### Creating Step Views
 
-Create a Blade view for your wizard component. You can use the `@step` and `@end-step` directives to conditionally show content based on the current step:
+Create Blade views for each step in your wizard. The views should be placed in the directory specified in the `directory()` method of your Wizard:
 
 ```blade
-<!-- resources/views/livewire/user-registration-wizard.blade.php -->
+<!-- resources/views/wizards/user-registration/account.blade.php -->
 <div>
-    <h1>User Registration</h1>
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" wire:model="data.account.email">
+        @error('data.account.email') <span class="error">{{ $message }}</span> @enderror
+    </div>
 
-    <div class="wizard-steps">
-        @step('account')
-            <h2>Account Information</h2>
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" wire:model="email">
-                @error('email') <span class="error">{{ $message }}</span> @enderror
-            </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" wire:model="data.account.password">
+        @error('data.account.password') <span class="error">{{ $message }}</span> @enderror
+    </div>
 
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" wire:model="password">
-                @error('password') <span class="error">{{ $message }}</span> @enderror
-            </div>
-        @end-step
-
-        @step('profile')
-            <h2>Profile Information</h2>
-            <div class="form-group">
-                <label for="name">Name</label>
-                <input type="text" id="name" wire:model="name">
-                @error('name') <span class="error">{{ $message }}</span> @enderror
-            </div>
-
-            <div class="form-group">
-                <label for="bio">Bio</label>
-                <textarea id="bio" wire:model="bio"></textarea>
-                @error('bio') <span class="error">{{ $message }}</span> @enderror
-            </div>
-        @end-step
-
-        @step('billing')
-            <h2>Billing Information</h2>
-            <div class="form-group">
-                <label for="card_number">Card Number</label>
-                <input type="text" id="card_number" wire:model="card_number">
-                @error('card_number') <span class="error">{{ $message }}</span> @enderror
-            </div>
-
-            <div class="form-group">
-                <label for="expiry">Expiry Date</label>
-                <input type="text" id="expiry" wire:model="expiry">
-                @error('expiry') <span class="error">{{ $message }}</span> @enderror
-            </div>
-        @end-step
-
-        <div class="wizard-navigation">
-            @if($currentStep !== $this->steps()[0])
-                <button type="button" wire:click="previous" class="btn btn-secondary">
-                    Previous
-                </button>
-            @endif
-
-            <button type="button" wire:click="next" class="btn btn-primary">
-                @if($currentStep === end($this->steps()))
-                    Complete
-                @else
-                    Next
-                @endif
-            </button>
-        </div>
+    <div class="form-group">
+        <label for="plan">Plan</label>
+        <select id="plan" wire:model="data.account.plan">
+            <option value="free">Free</option>
+            <option value="premium">Premium</option>
+        </select>
     </div>
 </div>
 ```
 
-### Registering and Using the Wizard in Your Application
+```blade
+<!-- resources/views/wizards/user-registration/profile.blade.php -->
+<div>
+    <div class="form-group">
+        <label for="name">Name</label>
+        <input type="text" id="name" wire:model="data.profile.name">
+        @error('data.profile.name') <span class="error">{{ $message }}</span> @enderror
+    </div>
 
-Register your wizard component in your Livewire configuration:
-
-```php
-// In your AppServiceProvider or a dedicated LivewireServiceProvider
-use Livewire\Livewire;
-use App\Livewire\UserRegistrationWizard;
-
-public function boot()
-{
-    Livewire::component('user-registration-wizard', UserRegistrationWizard::class);
-}
+    <div class="form-group">
+        <label for="bio">Bio</label>
+        <textarea id="bio" wire:model="data.profile.bio"></textarea>
+        @error('data.profile.bio') <span class="error">{{ $message }}</span> @enderror
+    </div>
+</div>
 ```
-
-Then, include the component in your Blade view:
 
 ```blade
-<livewire:user-registration-wizard />
+<!-- resources/views/wizards/user-registration/billing.blade.php -->
+<div>
+    <div class="form-group">
+        <label for="card_number">Card Number</label>
+        <input type="text" id="card_number" wire:model="data.billing.card_number">
+        @error('data.billing.card_number') <span class="error">{{ $message }}</span> @enderror
+    </div>
+
+    <div class="form-group">
+        <label for="expiry">Expiry Date</label>
+        <input type="text" id="expiry" wire:model="data.billing.expiry">
+        @error('data.billing.expiry') <span class="error">{{ $message }}</span> @enderror
+    </div>
+</div>
 ```
 
-## Blade Directives
+### Blade Directives
 
 The package provides two Blade directives for conditional rendering based on the current step:
 
 1. `@step('step-key')`: Renders content only if the current step matches the specified key.
-2. `@end-step`: Closes the conditional block.
+2. `@endstep`: Closes the conditional block.
 
 Example:
 
 ```blade
 @step('account')
     <!-- Content for the account step -->
-@end-step
+@endstep
 
 @step('profile')
     <!-- Content for the profile step -->
-@end-step
+@endstep
 ```
 
-## Example Implementation
+### Customizing the Wizard View
 
-Here's a complete example of a wizard implementation:
+The package comes with a default wizard view that includes navigation buttons and error handling. You can publish this view to customize it:
 
-```php
-<?php
-
-namespace App\Livewire;
-
-use Idkwhoami\FluxWizards\Traits\HasWizard;
-use Livewire\Component;
-
-class ExampleWizard extends Component
-{
-    use HasWizard;
-
-    protected function initialStep(): string
-    {
-        return 'account';
-    }
-
-    protected function steps(): array
-    {
-        return [
-            'account',
-            'profile',
-            'billing',
-        ];
-    }
-
-    public function computeNextStep(string $next): string
-    {
-        // You can add custom logic here to determine the next step
-        return $next;
-    }
-
-    public function computePreviousStep(string $previous): string
-    {
-        // You can add custom logic here to determine the previous step
-        return $previous;
-    }
-
-    public function render()
-    {
-        return view('livewire.example-wizard');
-    }
-}
+```bash
+php artisan vendor:publish --provider="Idkwhoami\FluxWizards\FluxWizardsServiceProvider"
 ```
+
+### Localization
+
+The package includes translations for navigation buttons. You can publish the language files to customize them:
+
+```bash
+php artisan vendor:publish --tag=flux-wizards-lang
+```
+
+## API Reference
+
+### Wizard Class
+
+The `Wizard` class is the main container for your wizard:
+
+- `make(string $name)`: Create a new wizard instance
+- `root(Step $root)`: Set the root step of the wizard
+- `directory(string $directory)`: Set the directory where step views are stored
+- `next()`: Move to the next step
+- `previous()`: Move to the previous step
+- `getCurrent()`: Get the current step
+- `setData(array $data)`: Set data for the wizard
+- `getData()`: Get all data from the wizard
+
+### Step Class
+
+The `Step` class represents a single step in your wizard:
+
+- `make(string $name)`: Create a new step instance
+- `label(string $label)`: Set a human-readable label for the step
+- `view(string $view)`: Set a custom view name (defaults to the step name)
+- `rules(array $rules)`: Set validation rules for the step
+- `children(array $children)`: Set child steps
+- `flow(Closure $flow)`: Set custom flow logic
+- `is(string $name)`: Check if the step has a specific name
+- `isFirst()`: Check if the step is the first in the sequence
+- `isLast()`: Check if the step is the last in the sequence
+- `validate(array $data)`: Validate the step data
+- `resolveNext(array $data)`: Resolve the next step based on flow logic
 
 ## License
 

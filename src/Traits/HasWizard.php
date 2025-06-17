@@ -15,29 +15,22 @@ trait HasWizard
     /**
      * The wizard instance.
      *
-     * @var Wizard
+     * @var ?Wizard
      */
-    #[Locked] public Wizard $wizard;
+    #[Locked] public ?Wizard $wizard = null;
 
     public array $data = [];
 
-    /**
-     * Initialize the component.
-     *
-     * @return void
-     */
-    public function bootHasWizard(): void
+    public function mountHasWizard(): void
     {
         $this->wizard = $this->createWizard();
-        $this->wizard->boot();
-
-        $this->wizard->setData($this->data);
+        $this->wizard->mount();
     }
 
-    /*public function updated(string $propertyName, $value): void
+    public function hydratedHasWizard(): void
     {
-        dump($propertyName, $value);
-    }*/
+        $this->wizard->setData($this->data);
+    }
 
     public function updatedData(): void
     {
